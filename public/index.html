@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>P2P Share</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #0f172a;
+    color: white;
+    text-align: center;
+}
+
+.container {
+    margin-top: 30px;
+}
+
+img {
+    width: 180px;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+li {
+    margin: 10px;
+    padding: 10px;
+    background: #1e293b;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+li:hover {
+    background: #334155;
+}
+
+.selected {
+    background: #22c55e !important;
+}
+
+button {
+    padding: 10px 20px;
+    margin-top: 10px;
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+}
+
+#connectBtn {
+    background: #3b82f6;
+    color: white;
+}
+
+#status {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+progress {
+    width: 80%;
+    height: 20px;
+    margin-top: 15px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>P2P Share</h1>
+
+    <img id="qr">
+    <p id="link"></p>
+
+    <h2>Dispositivos</h2>
+    <ul id="users"></ul>
+
+    <button id="connectBtn">Conectar</button>
+
+    <p id="status">🔴 Não conectado</p>
+
+    <br><br>
+    <input type="file" id="fileInput" disabled>
+
+    <progress id="progress" value="0" max="100"></progress>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
