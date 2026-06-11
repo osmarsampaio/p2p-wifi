@@ -55,12 +55,17 @@ socket.on("users", (users) => {
 
 const config = {
     iceServers: [
+        // Google STUN servers (100% gratuito e confiável)
         { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
         { urls: "stun:stun4.l.google.com:19302" },
+        
+        // Stun Protocol (gratuito)
         { urls: "stun:stun.stunprotocol.org:3478" },
         { urls: "stun:stun.stunprotocol.org:3478?transport=udp" },
+        
+        // OpenRelay TURN (100% gratuito, sem limite de taxa)
         {
             urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
             username: "openrelayproject",

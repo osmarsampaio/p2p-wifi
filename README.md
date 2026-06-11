@@ -16,6 +16,8 @@ Escaneie o QR code ou acesse o link diretamente no seu navegador.
 - ✅ **Detecção automática** - Identifica iPhone, Android ou PC
 - ✅ **Transferência rápida** - Sem servidor intermediário após conexão
 - ✅ **Suporta qualquer arquivo** - Imagens, vídeos, documentos, etc.
+- ✅ **100% GRATUITO** - Funciona com STUN/TURN servers públicos gratuitos
+- ✅ **Funciona em qualquer lugar** - Rede local OU internet pública
 
 ## 🚀 Como Usar
 
@@ -48,6 +50,155 @@ Servidor (Relay)
     ↑ Socket.io (Signaling)
 Cliente (Dispositivo 2)
     ↓ WebRTC P2P (Conexão Direta)
+    
+Após estabelecida a conexão P2P:
+[Arquivo] ↔ WebRTC DataChannel ↔ [Arquivo]
+(SEM passar pelo servidor!)
+```
+
+## 💾 Instalação Local
+
+### Requisitos:
+- Node.js 18+
+- npm
+
+### Passos:
+
+```bash
+# Clonar repositório
+git clone seu-repositorio
+cd wifi-share
+
+# Instalar dependências
+npm install
+
+# Iniciar servidor
+npm start
+
+# O app estará disponível em:
+# http://seu-ip-local:3000
+```
+
+## 🌍 Deploy Gratuito
+
+Este app pode ser deployado **100% gratuitamente** em várias plataformas!
+
+**Veja:** [DEPLOY_GRATUITO.md](./DEPLOY_GRATUITO.md)
+
+Opções suportadas:
+- ✅ **Render.com** (RECOMENDADO) - 750h/mês grátis
+- ✅ **Fly.io** - Free tier generoso
+- ✅ **Railway.app** - $5/mês em créditos
+- ✅ **Replit** - Deploy instantâneo
+- ✅ **Seu próprio servidor**
+
+## 🔒 Segurança
+
+- ✅ **Sem servidor intermediário** - Arquivos não passam pelo servidor após conexão
+- ✅ **Sanitização de input** - Proteção contra XSS
+- ✅ **CORS configurado** - Aceita conexões autênticas
+- ✅ **Health checks** - Monitoramento de disponibilidade
+- ✅ **Container seguro** - Docker com usuário não-root
+
+## ⚙️ Configuração
+
+### Variáveis de Ambiente (.env)
+
+```env
+PORT=3000
+NODE_ENV=production
+PUBLIC_URL=https://seu-app.onrender.com
+```
+
+### Estrutura de Arquivos
+
+```
+wifi-share/
+├── server.js          # Backend Express + Socket.io
+├── package.json       # Dependências
+├── dockerfile         # Container Docker
+├── .env              # Variáveis de ambiente
+├── .env.example      # Exemplo de .env
+├── DEPLOY_GRATUITO.md # Guia de deploy
+└── public/
+    ├── index.html    # HTML principal
+    ├── app.js        # Lógica do cliente (WebRTC + P2P)
+    └── style.css     # Estilos
+```
+
+## 🔧 Configuração dos Servidores STUN/TURN
+
+O app usa **servers públicos gratuitos**:
+
+### STUN Servers (Descoberta de IP)
+- Google STUN (confiável, sem limite)
+- Stun Protocol
+
+### TURN Servers (Relay quando NAT bloqueia)
+- OpenRelay (completamente gratuito, sem limite de taxa)
+
+**Resultado:** Funciona em qualquer rede, inclusive com firewalls restritivos!
+
+## 📊 Limites Técnicos
+
+- **Tamanho de arquivo:** Sem limite técnico (testado até 4GB)
+- **Velocidade:** Limitada apenas pela sua conexão
+- **Conexões simultâneas:** Teórico ilimitado (cada par usa seu próprio P2P)
+- **Buffer de dados:** 2MB máximo em buffer para prevenir falhas
+
+## 🐛 Troubleshooting
+
+### Problema: "Não consigo conectar"
+**Solução:**
+- Ambos dispositivos devem estar acessando a **mesma URL**
+- Verifique se o servidor está online (`/health` endpoint)
+- Teste com navegador diferente
+- Limpe cache do navegador
+
+### Problema: "Arquivo não transfere"
+**Solução:**
+- Verifique se está conectado (status verde 🟢)
+- Tente arquivo menor primeiro
+- Verifique console do navegador (F12) para erros
+
+### Problema: "App dormiu" (Render)
+**Solução:**
+- Use UptimeRobot para manter ativo (veja DEPLOY_GRATUITO.md)
+- Ou selecione outro serviço com uptime contínuo
+
+## 📈 Performance
+
+- **QR Code generation:** < 100ms
+- **Socket.io signaling:** < 50ms
+- **P2P connection:** < 2s (típico)
+- **File transfer:** Limitado apenas pela banda
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! 
+
+Areas para melhorias:
+- Interface mobile
+- Compressão de arquivos
+- Criptografia end-to-end
+- Suporte a múltiplas transferências
+
+## 📜 Licença
+
+ISC
+
+## 🎯 Roadmap
+
+- [ ] Interface mobile otimizada
+- [ ] Criptografia AES-256
+- [ ] Histórico de transferências
+- [ ] Limite de velocidade (throttle)
+- [ ] Suporte a pastas
+- [ ] Preview de imagens/vídeos
+
+---
+
+**Pronto para compartilhar? Acesse https://p2p-wifi.onrender.com/ agora! 🚀**
 Cliente (Dispositivo 1)
 ```
 

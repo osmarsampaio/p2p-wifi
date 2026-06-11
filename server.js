@@ -3,19 +3,17 @@ const http = require("http")
 const { Server } = require("socket.io")
 const QRCode = require("qrcode")
 const os = require("os")
+require("dotenv").config()
 
 const app = express()
 const server = http.createServer(app)
+
+// Configurar CORS mais permissivo para funcionar em qualquer lugar
 const io = new Server(server, {
     cors: {
-        origin: [
-            "https://p2p-wifi.onrender.com",
-            "http://localhost:3000",
-            "http://localhost",
-            /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
-            /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/
-        ],
-        methods: ["GET", "POST"]
+        origin: "*",
+        methods: ["GET", "POST"],
+        credentials: false
     }
 })
 
@@ -44,13 +42,16 @@ app.get("/qrcode", async (req, res) => {
     try {
         let url
         
-        // Se está no Render (detecta pela host do request)
-        if (req.get("host").includes("onrender.com") || process.env.NODE_ENV === "production") {
-            url = `https://p2p-wifi.onrender.com/`
+        // Detectar se está em produção pela variável de ambiente ou URL
+        const isProduction = process.env.NODE_ENV === "production" || req.get("host").includes("onrender.com") || req.get("host").includes("render.com")
+        
+        if (isProduction && process.env.PUBLIC_URL) {
+            url = process.env.PUBLIC_URL
         } else {
-            // Uso local
+            // Uso local - pegar IP da máquina
             const ip = getLocalIP()
-            url = `http://${ip}:3000`
+            const port = process.env.PORT || 3000
+            url = `http://${ip}:${port}`
         }
         
         const qr = await QRCode.toDataURL(url)
@@ -63,7 +64,12 @@ app.get("/qrcode", async (req, res) => {
 
 // Health check endpoint
 app.get("/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() })
+    res.json({ 
+        status: "ok", 
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "development",
+        version: require("./package.json").version
+    })
 })
 
 // Função de validação de device
