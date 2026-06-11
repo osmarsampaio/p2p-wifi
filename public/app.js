@@ -24,6 +24,9 @@ let channelReady = false
 let file
 let iceCandidateQueue = []
 let remoteDescriptionSet = false
+let reconnectAttempts = 0
+let maxReconnectAttempts = 5
+window.fileReceiveState = null
 
 // Gerar QR Code ao carregar
 fetch("/qrcode")
@@ -77,6 +80,45 @@ const config = {
     iceCandidatePoolSize: 50
 }
 
+// Tipos de arquivo permitidos (sem limite de tamanho)
+const ALLOWED_FILE_TYPES = [
+    'image/*',
+    'video/*',
+    'audio/*',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/*',
+    'application/zip',
+    'application/x-rar-compressed',
+    'application/x-7z-compressed',
+    'application/x-tar',
+    'application/x-gzip'
+]
+
+function validateFileType(file) {
+    // Verifica se o tipo de arquivo está na lista de permitidos
+    const isAllowed = ALLOWED_FILE_TYPES.some(type => {
+        if (type.endsWith('/*')) {
+            const category = type.split('/*')[0]
+            return file.type.startsWith(category)
+        }
+        return file.type === type
+    })
+    
+    // Se não tiver tipo MIME (arquivos sem extensão ou desconhecidos), permite
+    if (!file.type) {
+        console.warn("⚠️ Arquivo sem tipo MIME detectado, permitindo por segurança")
+        return true
+    }
+    
+    return isAllowed
+}
+
 function createPeer(targetId) {
     console.log("🔨 Criando nova conexão P2P com:", targetId)
     
@@ -89,43 +131,93 @@ function createPeer(targetId) {
         const state = peerConnection.connectionState
         console.log("📊 Estado da conexão:", state)
         
-        if (state === \"connected\") {
-            console.log(\"✅ Conexão P2P estabelecida\")
-            setStatus(\"🟢 Conectado\")
-        } else if (state === \"failed\") {
-            console.error(\"❌ Conexão falhou\")
-            setStatus(\"❌ Conexão falhou - tente novamente\")
-        } else if (state === \"disconnected\") {
-            setStatus(\"🔴 Desconectado\")
+        if (state === "connected") {
+            console.log("✅ Conexão P2P estabelecida")
+            setStatus("🟢 Conectado")
+            reconnectAttempts = 0 // Reset contador de reconexão
+        } else if (state === "failed") {
+            console.error("❌ Conexão falhou")
+            setStatus("❌ Conexão falhou - tente novamente")
+            // Tentar reconexão automática
+            attemptReconnect()
+        } else if (state === "disconnected") {
+            setStatus("🔴 Desconectado")
+            // Tentar reconexão automática
+            attemptReconnect()
         }
     }
     
     // Monitorar estado do ICE
     peerConnection.oniceconnectionstatechange = () => {
         const state = peerConnection.iceConnectionState
-        console.log(\"❄️ Estado ICE:\", state)
+        console.log("❄️ Estado ICE:", state)
     }
     
     // Enviar ICE candidates
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            console.log(\"🧊 ICE candidate encontrado:\", event.candidate.candidate.split(\" \")[7])
-            socket.emit(\"signal\", {
+            console.log("🧊 ICE candidate encontrado:", event.candidate.candidate.split(" ")[7])
+            socket.emit("signal", {
                 to: targetId,
-                type: \"ice-candidate\",
+                type: "ice-candidate",
                 candidate: event.candidate
             })
         } else {
-            console.log(\"✅ ICE gathering completo\")
+            console.log("✅ ICE gathering completo")
         }
     }
     
     // Receber datachannel (para quem aceita)
     peerConnection.ondatachannel = (event) => {
-        console.log(\"📥 DataChannel recebido:\", event.channel.label)
+        console.log("📥 DataChannel recebido:", event.channel.label)
         dataChannel = event.channel
         setupDataChannel()
     }
+}
+
+// Função de reconexão automática
+function attemptReconnect() {
+    if (reconnectAttempts >= maxReconnectAttempts) {
+        console.error("❌ Máximo de tentativas de reconexão atingido")
+        setStatus("❌ Não foi possível reconectar")
+        return
+    }
+    
+    reconnectAttempts++
+    console.log(`🔄 Tentando reconectar (${reconnectAttempts}/${maxReconnectAttempts})...`)
+    setStatus(`🔄 Reconectando... (${reconnectAttempts}/${maxReconnectAttempts})`)
+    
+    setTimeout(() => {
+        if (selectedUser && peerConnection && peerConnection.connectionState !== "connected") {
+            // Limpar conexão antiga
+            if (peerConnection) {
+                peerConnection.close()
+            }
+            
+            // Criar nova conexão
+            createPeer(selectedUser)
+            
+            // Se for o iniciador, criar datachannel e oferta
+            if (dataChannel) {
+                dataChannel = peerConnection.createDataChannel("file")
+                setupDataChannel()
+                
+                peerConnection.createOffer({
+                    offerToReceiveAudio: false,
+                    offerToReceiveVideo: false
+                }).then(offer => {
+                    peerConnection.setLocalDescription(offer)
+                    socket.emit("signal", {
+                        to: selectedUser,
+                        type: "offer",
+                        sdp: offer
+                    })
+                }).catch(error => {
+                    console.error("❌ Erro ao reconectar:", error)
+                })
+            }
+        }
+    }, 2000 * reconnectAttempts) // Exponential backoff
 }
 
 // Iniciar conexão (Lado que clica no botão)
@@ -333,6 +425,13 @@ document.getElementById("fileInput").addEventListener("change", async () => {
     file = document.getElementById("fileInput").files[0]
     if (!file) return
     
+    // Validar tipo de arquivo
+    if (!validateFileType(file)) {
+        alert("Tipo de arquivo não permitido. Tipos permitidos: imagens, vídeos, áudio, documentos PDF, Office, texto e arquivos compactados.")
+        document.getElementById("fileInput").value = ""
+        return
+    }
+    
     try {
         console.log("📤 Iniciando envio de arquivo:", file.name, file.size, "bytes")
         
@@ -352,6 +451,7 @@ document.getElementById("fileInput").addEventListener("change", async () => {
                 dataChannel.send(JSON.stringify({ type: "end" }))
                 setStatus("🟢 Arquivo enviado com sucesso")
                 document.getElementById("progress").value = 0
+                document.getElementById("fileInput").value = ""
                 console.log("✅ Transferência concluída")
                 return
             }

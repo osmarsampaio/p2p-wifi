@@ -1,3 +1,9 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
     font-family: Arial, sans-serif;
@@ -8,40 +14,152 @@ body {
 
 .container {
     padding: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin: 20px 0;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-top: 20px;
+    margin-bottom: 15px;
+}
+
+img {
+    width: 180px;
+    height: auto;
+    margin: 20px 0;
+    border-radius: 8px;
+}
+
+#link {
+    word-break: break-all;
+    margin: 10px 0;
+    padding: 10px;
+    background: #1e293b;
+    border-radius: 8px;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0;
+}
+
+li {
+    margin: 10px auto;
+    padding: 12px;
+    background: #1e293b;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+li:hover {
+    background: #334155;
+    transform: translateY(-2px);
+}
+
+li:active {
+    transform: translateY(0);
+}
+
+.selected {
+    background: #22c55e !important;
+    border-color: #16a34a;
+}
+
+button {
+    padding: 12px 24px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+#connectBtn {
+    background: #3b82f6;
+    color: white;
+}
+
+#connectBtn:hover:not(:disabled) {
+    background: #2563eb;
+    transform: translateY(-2px);
+}
+
+#connectBtn:disabled {
+    background: #64748b;
+    cursor: not-allowed;
+}
+
+#fileInput {
+    padding: 10px;
+    margin: 15px 0;
+    cursor: pointer;
+}
+
+#status {
+    margin-top: 15px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    min-height: 30px;
+}
+
+progress {
+    width: 80%;
+    height: 20px;
+    margin: 20px auto;
+    display: block;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+progress::-webkit-progress-bar {
+    background: #334155;
+}
+
+progress::-webkit-progress-value {
+    background: #22c55e;
+}
+
+progress::-moz-progress-bar {
+    background: #22c55e;
 }
 
 .card {
     background: #1e293b;
     padding: 20px;
     border-radius: 16px;
-    margin: 10px;
-}
-
-button {
-    background: #22c55e;
-    border: none;
-    padding: 10px 20px;
-    color: white;
-    border-radius: 10px;
-    cursor: pointer;
-}
-
-.progress {
-    height: 8px;
-    background: #334155;
-    border-radius: 10px;
-    overflow: hidden;
-    margin-top: 10px;
-}
-
-.progress-bar {
-    height: 100%;
-    width: 0%;
-    background: #22c55e;
+    margin: 10px auto;
 }
 
 @media (max-width: 600px) {
-    .card {
-        font-size: 14px;
+    h1 {
+        font-size: 1.8rem;
+    }
+
+    h2 {
+        font-size: 1.2rem;
+    }
+
+    button {
+        padding: 10px 16px;
+        font-size: 0.95rem;
+    }
+
+    img {
+        width: 150px;
+    }
+
+    progress {
+        width: 90%;
     }
 }
