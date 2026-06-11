@@ -5,9 +5,7 @@ function getDevice() {
     return "PC"
 }
 
-const socket = io({
-    query: { device: getDevice() }
-})
+const socket = io()
 
 console.log("🔌 Conectando ao servidor WebSocket...")
 socket.on("connect", () => {
@@ -16,6 +14,7 @@ socket.on("connect", () => {
 
 socket.on("disconnect", () => {
     console.log("❌ Desconectado do servidor")
+    setStatus("🔴 Desconectado do servidor")
 })
 
 let selectedUser = null
@@ -23,6 +22,8 @@ let peerConnection
 let dataChannel
 let channelReady = false
 let file
+let iceCandidateQueue = []
+let remoteDescriptionSet = false
 
 // Gerar QR Code ao carregar
 fetch("/qrcode")
@@ -51,18 +52,14 @@ socket.on("users", (users) => {
 
 const config = {
     iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
         { urls: "stun:stun4.l.google.com:19302" },
+        { urls: "stun:stun.stunprotocol.org:3478" },
+        { urls: "stun:stun.stunprotocol.org:3478?transport=udp" },
         {
-            urls: "turn:openrelay.metered.ca:80",
-            username: "openrelayproject",
-            credential: "openrelayproject"
-        },
-        {
-            urls: "turn:openrelay.metered.ca:443",
+            urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
             username: "openrelayproject",
             credential: "openrelayproject"
         },
@@ -76,212 +73,314 @@ const config = {
             username: "openrelayproject",
             credential: "openrelayproject"
         }
-    ]
+    ],
+    iceCandidatePoolSize: 50
 }
 
 function createPeer(targetId) {
+    console.log("🔨 Criando nova conexão P2P com:", targetId)
+    
     peerConnection = new RTCPeerConnection(config)
-
+    iceCandidateQueue = []
+    remoteDescriptionSet = false
+    
     // Monitorar estado da conexão
     peerConnection.onconnectionstatechange = () => {
         const state = peerConnection.connectionState
-        console.log("Estado da conexão:", state)
-        if (state === "failed") {
-            setStatus("❌ Conexão falhou, tentando reconectar...")
-            setTimeout(() => {
-                peerConnection.close()
-                createPeer(targetId)
-            }, 2000)
+        console.log("📊 Estado da conexão:", state)
+        
+        if (state === \"connected\") {
+            console.log(\"✅ Conexão P2P estabelecida\")
+            setStatus(\"🟢 Conectado\")
+        } else if (state === \"failed\") {
+            console.error(\"❌ Conexão falhou\")
+            setStatus(\"❌ Conexão falhou - tente novamente\")
+        } else if (state === \"disconnected\") {
+            setStatus(\"🔴 Desconectado\")
         }
     }
-
-    // Monitorar ICE candidates
-    peerConnection.onicecandidate = e => {
-        if (e.candidate) {
-            console.log("ICE candidate encontrado:", e.candidate.candidate)
-            socket.emit("ice-candidate", {
+    
+    // Monitorar estado do ICE
+    peerConnection.oniceconnectionstatechange = () => {
+        const state = peerConnection.iceConnectionState
+        console.log(\"❄️ Estado ICE:\", state)
+    }
+    
+    // Enviar ICE candidates
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            console.log(\"🧊 ICE candidate encontrado:\", event.candidate.candidate.split(\" \")[7])
+            socket.emit(\"signal\", {
                 to: targetId,
-                candidate: e.candidate
+                type: \"ice-candidate\",
+                candidate: event.candidate
             })
         } else {
-            console.log("ICE gathering completo")
+            console.log(\"✅ ICE gathering completo\")
         }
     }
-
-    peerConnection.ondatachannel = e => {
-        dataChannel = e.channel
-        setupChannel(dataChannel)
-    }
-
-    // Timeout de 30 segundos
-    const timeout = setTimeout(() => {
-        if (!channelReady) {
-            setStatus("⏱️ Timeout - Verifique a conexão e tente novamente")
-            console.error("Conexão P2P expirou após 30 segundos")
-        }
-    }, 30000)
-
-    // Limpar timeout quando conectar
-    peerConnection.ondatachannel = (e) => {
-        clearTimeout(timeout)
-        dataChannel = e.channel
-        setupChannel(dataChannel)
+    
+    // Receber datachannel (para quem aceita)
+    peerConnection.ondatachannel = (event) => {
+        console.log(\"📥 DataChannel recebido:\", event.channel.label)
+        dataChannel = event.channel
+        setupDataChannel()
     }
 }
 
-// Iniciar conexão (Lado que envia)
+// Iniciar conexão (Lado que clica no botão)
 document.getElementById("connectBtn").onclick = async () => {
     if (!selectedUser) return alert("Selecione um dispositivo")
-
-    setStatus("🟡 Conectando...")
-    console.log("🔗 Iniciando conexão P2P com:", selectedUser)
-
-    try {
-        createPeer(selectedUser)
-        dataChannel = peerConnection.createDataChannel("file")
-        setupChannel(dataChannel)
-
-        const offer = await peerConnection.createOffer()
-        await peerConnection.setLocalDescription(offer)
-
-        console.log("📤 Enviando oferta...")
-        socket.emit("offer", { to: selectedUser, offer })
-    } catch (error) {
-        setStatus("❌ Erro ao criar oferta: " + error.message)
-        console.error("Erro:", error)
+    if (peerConnection && peerConnection.connectionState === "connected") {
+        return alert("Já conectado a um dispositivo")
     }
-}
-
-// Receber oferta (Lado que aceita)
-socket.on("offer", async (data) => {
-    console.log("📥 Oferta recebida de:", data.from)
-    selectedUser = data.from // Define quem enviou a oferta como alvo
+    
+    console.log("🚀 Iniciando conexão com:", selectedUser)
     setStatus("🟡 Conectando...")
     
     try {
-        createPeer(data.from)
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
-        const answer = await peerConnection.createAnswer()
-        await peerConnection.setLocalDescription(answer)
-
-        console.log("📤 Enviando resposta...")
-        socket.emit("answer", { to: data.from, answer })
+        createPeer(selectedUser)
+        
+        // Criar datachannel no iniciador
+        dataChannel = peerConnection.createDataChannel("file")
+        setupDataChannel()
+        
+        // Criar oferta
+        console.log("📝 Criando oferta SDP...")
+        const offer = await peerConnection.createOffer({
+            offerToReceiveAudio: false,
+            offerToReceiveVideo: false
+        })
+        
+        await peerConnection.setLocalDescription(offer)
+        console.log("✅ Local description setada")
+        
+        // Enviar oferta
+        console.log("📤 Enviando oferta ao servidor...")
+        socket.emit("signal", {
+            to: selectedUser,
+            type: "offer",
+            sdp: offer
+        })
     } catch (error) {
-        console.error("Erro ao processar oferta:", error)
-        setStatus("❌ Erro ao processar oferta: " + error.message)
+        console.error("❌ Erro ao iniciar:", error)
+        setStatus("❌ Erro: " + error.message)
     }
-})
+}
 
-socket.on("answer", async (data) => {
-    console.log("📥 Resposta recebida")
-    try {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
-        console.log("✅ Resposta processada")
-    } catch (error) {
-        console.error("Erro ao processar resposta:", error)
-        setStatus("❌ Erro ao processar resposta: " + error.message)
-    }
-})
-
-socket.on("ice-candidate", async (data) => {
-    if (data.candidate && peerConnection) {
+// Processar ICE candidates enfileirados
+async function processIceCandidateQueue() {
+    while (iceCandidateQueue.length > 0 && remoteDescriptionSet) {
+        const candidate = iceCandidateQueue.shift()
         try {
-            await peerConnection.addIceCandidate(data.candidate)
-        } catch (e) { 
-            console.warn("Erro ao adicionar ICE candidate:", e)
+            await peerConnection.addIceCandidate(candidate)
+            console.log("✅ ICE candidate adicionado")
+        } catch (error) {
+            console.warn("⚠️ Erro ao adicionar ICE:", error)
+        }
+    }
+}
+
+// Receber oferta
+socket.on("signal", async (data) => {
+    console.log("📨 Sinal recebido:", data.type)
+    
+    if (data.type === "offer") {
+        console.log("📥 Oferta recebida de:", data.from)
+        selectedUser = data.from
+        setStatus("🟡 Conectando...")
+        
+        try {
+            createPeer(data.from)
+            
+            // Settar remote description da oferta
+            console.log("📝 Processando oferta...")
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp))
+            remoteDescriptionSet = true
+            console.log("✅ Remote description setada (oferta)")
+            
+            // Processar ICE candidates que chegaram antes
+            await processIceCandidateQueue()
+            
+            // Criar resposta
+            console.log("📝 Criando resposta...")
+            const answer = await peerConnection.createAnswer()
+            await peerConnection.setLocalDescription(answer)
+            console.log("✅ Local description setada (resposta)")
+            
+            // Enviar resposta
+            console.log("📤 Enviando resposta...")
+            socket.emit("signal", {
+                to: data.from,
+                type: "answer",
+                sdp: answer
+            })
+        } catch (error) {
+            console.error("❌ Erro ao processar oferta:", error)
+            setStatus("❌ Erro: " + error.message)
+        }
+    }
+    
+    else if (data.type === "answer") {
+        console.log("📥 Resposta recebida")
+        
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp))
+            remoteDescriptionSet = true
+            console.log("✅ Remote description setada (resposta)")
+            
+            // Processar ICE candidates enfileirados
+            await processIceCandidateQueue()
+        } catch (error) {
+            console.error("❌ Erro ao processar resposta:", error)
+            setStatus("❌ Erro: " + error.message)
+        }
+    }
+    
+    else if (data.type === "ice-candidate" && peerConnection) {
+        try {
+            if (remoteDescriptionSet) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+                console.log("✅ ICE candidate adicionado imediatamente")
+            } else {
+                iceCandidateQueue.push(new RTCIceCandidate(data.candidate))
+                console.log("📋 ICE candidate enfileirado (aguardando remote description)")
+            }
+        } catch (error) {
+            console.warn("⚠️ Erro ao processar ICE:", error)
         }
     }
 })
 
 function setStatus(text) {
     document.getElementById("status").innerText = text
+    console.log("📌 Status:", text)
 }
 
-function setupChannel(channel) {
-    channel.binaryType = "arraybuffer"
-    let received = []
-    let receivedSize = 0
-    let fileSize = 0
-    let fileName = ""
-
-    channel.onopen = () => {
+function setupDataChannel() {
+    if (!dataChannel) return
+    
+    dataChannel.binaryType = "arraybuffer"
+    
+    dataChannel.onopen = () => {
         channelReady = true
+        console.log("✅ DataChannel aberto - pronto para enviar")
         setStatus("🟢 Conectado")
         document.getElementById("fileInput").disabled = false
-        console.log("✅ DataChannel aberto")
     }
-
-    channel.onclose = () => {
+    
+    dataChannel.onclose = () => {
         channelReady = false
+        console.log("❌ DataChannel fechado")
         setStatus("🔴 Desconectado")
         document.getElementById("fileInput").disabled = true
-        console.log("❌ DataChannel fechado")
     }
-
-    channel.onerror = (error) => {
+    
+    dataChannel.onerror = (error) => {
         console.error("❌ Erro no DataChannel:", error)
-        setStatus("❌ Erro na conexão: " + error.message)
+        setStatus("❌ Erro: " + error.message)
     }
-
-    channel.onmessage = async (e) => {
-        if (typeof e.data === "string") {
-            const msg = JSON.parse(e.data)
+    
+    dataChannel.onmessage = (event) => {
+        if (typeof event.data === "string") {
+            const msg = JSON.parse(event.data)
+            
             if (msg.type === "meta") {
-                fileName = msg.name
-                fileSize = msg.size
-                received = []
-                receivedSize = 0
-                console.log("📥 Recebendo arquivo:", fileName, fileSize, "bytes")
-            }
-            if (msg.type === "end") {
-                const blob = new Blob(received)
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement("a")
-                a.href = url
-                a.download = fileName
-                a.click()
-                setStatus("🟢 Download concluído: " + fileName)
-                console.log("✅ Arquivo recebido com sucesso")
+                console.log("📥 Meta recebida:", msg.name, msg.size, "bytes")
+                window.fileReceiveState = {
+                    fileName: msg.name,
+                    fileSize: msg.size,
+                    chunks: [],
+                    receivedSize: 0
+                }
+            } else if (msg.type === "end") {
+                finishFileDownload()
             }
             return
         }
-        received.push(e.data)
-        receivedSize += e.data.byteLength
-        document.getElementById("progress").value = (receivedSize / fileSize) * 100
+        
+        // Receber chunks do arquivo
+        if (window.fileReceiveState) {
+            window.fileReceiveState.chunks.push(event.data)
+            window.fileReceiveState.receivedSize += event.data.byteLength
+            const progress = (window.fileReceiveState.receivedSize / window.fileReceiveState.fileSize) * 100
+            document.getElementById("progress").value = progress
+            console.log("📥 Recebido:", progress.toFixed(1) + "%")
+        }
     }
 }
 
-document.getElementById("fileInput").addEventListener("change", () => {
+function finishFileDownload() {
+    if (!window.fileReceiveState) return
+    
+    const { fileName, chunks } = window.fileReceiveState
+    const blob = new Blob(chunks)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = fileName
+    a.click()
+    URL.revokeObjectURL(url)
+    
+    setStatus("🟢 Download concluído: " + fileName)
+    console.log("✅ Arquivo baixado com sucesso")
+    document.getElementById("progress").value = 0
+}
+
+document.getElementById("fileInput").addEventListener("change", async () => {
     if (!channelReady) return alert("Conecte primeiro")
+    
     file = document.getElementById("fileInput").files[0]
     if (!file) return
-
-    dataChannel.send(JSON.stringify({ type: "meta", name: file.name, size: file.size }))
-    sendFile()
-})
-
-function sendFile() {
-    const chunkSize = 16 * 1024 // 16kb para maior estabilidade
-    let offset = 0
-
-    function sendChunk() {
-        while (offset < file.size && dataChannel.bufferedAmount < 1024 * 1024) {
-            const slice = file.slice(offset, offset + chunkSize)
+    
+    try {
+        console.log("📤 Iniciando envio de arquivo:", file.name, file.size, "bytes")
+        
+        // Enviar metadados
+        dataChannel.send(JSON.stringify({
+            type: "meta",
+            name: file.name,
+            size: file.size
+        }))
+        
+        // Enviar arquivo em chunks
+        const chunkSize = 64 * 1024 // 64KB chunks
+        let offset = 0
+        
+        const sendChunk = () => {
+            if (offset >= file.size) {
+                dataChannel.send(JSON.stringify({ type: "end" }))
+                setStatus("🟢 Arquivo enviado com sucesso")
+                document.getElementById("progress").value = 0
+                console.log("✅ Transferência concluída")
+                return
+            }
+            
+            const chunk = file.slice(offset, offset + chunkSize)
             const reader = new FileReader()
+            
             reader.onload = (e) => {
                 dataChannel.send(e.target.result)
-                offset += slice.size
-                document.getElementById("progress").value = (offset / file.size) * 100
-                if (offset >= file.size) {
-                    dataChannel.send(JSON.stringify({ type: "end" }))
-                } else {
+                offset += chunkSize
+                const progress = (offset / file.size) * 100
+                document.getElementById("progress").value = Math.min(progress, 100)
+                
+                // Enviar próximo chunk se buffer não está muito cheio
+                if (dataChannel.bufferedAmount < 2 * 1024 * 1024) {
                     sendChunk()
+                } else {
+                    setTimeout(sendChunk, 100)
                 }
-            };
-            reader.readAsArrayBuffer(slice)
-            return
+            }
+            
+            reader.readAsArrayBuffer(chunk)
         }
-        if (offset < file.size) setTimeout(sendChunk, 10)
+        
+        sendChunk()
+    } catch (error) {
+        console.error("❌ Erro ao enviar arquivo:", error)
+        setStatus("❌ Erro: " + error.message)
     }
-    sendChunk()
-}
+})
+
+console.log("✅ App.js carregado com sucesso")
