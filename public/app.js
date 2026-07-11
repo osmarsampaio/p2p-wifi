@@ -64,7 +64,6 @@ const config = {
         
         // Stun Protocol (gratuito)
         { urls: "stun:stun.stunprotocol.org:3478" },
-        { urls: "stun:stun.stunprotocol.org:3478?transport=udp" },
         
         // OpenRelay TURN (100% gratuito, sem limite de taxa)
         {
@@ -83,7 +82,7 @@ const config = {
             credential: "openrelayproject"
         }
     ],
-    iceCandidatePoolSize: 50
+    iceCandidatePoolSize: 10
 }
 
 // Tipos de arquivo permitidos (sem limite de tamanho)
