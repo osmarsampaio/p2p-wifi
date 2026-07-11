@@ -1,35 +1,108 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Share - Compartilhamento Seguro de Arquivos</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P2P Share — Transferência sem fio entre dispositivos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
+<body data-state="idle">
 
-<body>
+<div class="console">
 
-<div class="container">
-    <h1>📱 P2P Share</h1>
+  <!-- Cabeçalho / elemento assinatura -->
+  <header class="console__header">
+    <p class="eyebrow">Sinal P2P · Wi-Fi local</p>
+    <h1 class="title">P2P Share</h1>
+    <p class="subtitle">Duas antenas, uma transferência. Sem servidor no meio do caminho.</p>
 
-    <img id="qr" alt="QR Code para conectar outro dispositivo" loading="lazy">
-    <p id="link" aria-live="polite"></p>
-
-    <h2>Dispositivos Conectados</h2>
-    <ul id="users" role="listbox" aria-label="Lista de dispositivos disponíveis"></ul>
-
-    <button id="connectBtn" aria-label="Conectar ao dispositivo selecionado">🔗 Conectar</button>
-
-    <p id="status" role="status" aria-live="polite" aria-atomic="true">🔴 Não conectado</p>
-
-    <div>
-        <input type="file" id="fileInput" disabled aria-label="Selecionar arquivo para compartilhar">
-        <progress id="progress" value="0" max="100" aria-label="Progresso da transferência do arquivo"></progress>
+    <div class="signal-bridge" aria-hidden="true">
+      <div class="node node--local">
+        <svg viewBox="0 0 24 24" class="node__icon"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2.06A8.002 8.002 0 0 1 19.94 11H22a1 1 0 1 1 0 2h-2.06A8.002 8.002 0 0 1 13 19.94V22a1 1 0 1 1-2 0v-2.06A8.002 8.002 0 0 1 4.06 13H2a1 1 0 1 1 0-2h2.06A8.002 8.002 0 0 1 11 4.06V2a1 1 0 0 1 1-1Zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>
+      </div>
+      <div class="signal-bridge__waves">
+        <span class="wave"></span>
+        <span class="wave"></span>
+        <span class="wave"></span>
+        <span class="pulse-dot"></span>
+      </div>
+      <div class="node node--remote">
+        <svg viewBox="0 0 24 24" class="node__icon"><path fill="currentColor" d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-4l1 3H9l1-3H6a2 2 0 0 1-2-2V6Zm2 0v9h12V6H6Z"/></svg>
+      </div>
     </div>
+  </header>
+
+  <!-- Painel principal -->
+  <main class="panels">
+
+    <!-- Painel: canal / dispositivos -->
+    <section class="panel" aria-labelledby="panel-channel-title">
+      <div class="panel__head">
+        <span class="panel__index">Canal</span>
+        <h2 id="panel-channel-title" class="panel__title">Conectar dispositivo</h2>
+      </div>
+
+      <div class="qr-block">
+        <img id="qr" class="qr-block__img" alt="QR Code para conectar outro dispositivo" loading="lazy">
+        <p id="link" class="qr-block__link" aria-live="polite"></p>
+      </div>
+
+      <h3 class="sublabel">Dispositivos na frequência</h3>
+      <ul id="users" class="freq-list" role="listbox" aria-label="Lista de dispositivos disponíveis">
+        <li class="freq-empty" data-placeholder>Procurando dispositivos por perto…</li>
+      </ul>
+    </section>
+
+    <!-- Painel: transferência -->
+    <section class="panel" aria-labelledby="panel-transfer-title">
+      <div class="panel__head">
+        <span class="panel__index">Link</span>
+        <h2 id="panel-transfer-title" class="panel__title">Transferência</h2>
+      </div>
+
+      <button id="connectBtn" class="switch" aria-label="Conectar ao dispositivo selecionado">
+        <span class="switch__knob"></span>
+        <span class="switch__label">Conectar</span>
+      </button>
+
+      <p id="status" class="readout" role="status" aria-live="polite" aria-atomic="true">
+        <span class="readout__dot"></span>
+        <span class="readout__text">Não conectado</span>
+      </p>
+
+      <div class="transfer-block">
+        <label for="fileInput" class="file-drop" data-disabled="true">
+          <svg viewBox="0 0 24 24" class="file-drop__icon"><path fill="currentColor" d="M12 3a1 1 0 0 1 .78.375l5 6a1 1 0 1 1-1.56 1.25L13 6.855V16a1 1 0 1 1-2 0V6.855l-3.22 3.77a1 1 0 1 1-1.56-1.25l5-6A1 1 0 0 1 12 3ZM5 19a1 1 0 1 0 0 2h14a1 1 0 1 0 0-2H5Z"/></svg>
+          <span class="file-drop__text">Escolher arquivo para enviar</span>
+          <input type="file" id="fileInput" disabled aria-label="Selecionar arquivo para compartilhar">
+        </label>
+
+        <div class="meter" role="progressbar" aria-label="Progresso da transferência do arquivo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <progress id="progress" value="0" max="100" class="meter__native"></progress>
+          <div class="meter__bars" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="console__footer">
+    <p>Transferência direta por WebRTC — nenhum arquivo passa pelo servidor após a conexão.</p>
+  </footer>
+
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="app.js"></script>
+<script src="ui.js"></script>
 
 </body>
 </html>

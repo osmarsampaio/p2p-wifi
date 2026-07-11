@@ -26,6 +26,7 @@ let iceCandidateQueue = []
 let remoteDescriptionSet = false
 let reconnectAttempts = 0
 let maxReconnectAttempts = 5
+let isInitiator = false // corrige bug: quem abriu a conexão original, e não "tem dataChannel"
 window.fileReceiveState = null
 
 // Gerar QR Code ao carregar
@@ -202,8 +203,8 @@ function attemptReconnect() {
             // Criar nova conexão
             createPeer(selectedUser)
             
-            // Se for o iniciador, criar datachannel e oferta
-            if (dataChannel) {
+            // Se for o iniciador original (e não quem apenas recebeu o convite), recriar oferta
+            if (isInitiator) {
                 dataChannel = peerConnection.createDataChannel("file")
                 setupDataChannel()
                 
@@ -236,6 +237,7 @@ document.getElementById("connectBtn").onclick = async () => {
     setStatus("🟡 Conectando...")
     
     try {
+        isInitiator = true
         createPeer(selectedUser)
         
         // Criar datachannel no iniciador
@@ -285,6 +287,7 @@ socket.on("signal", async (data) => {
     if (data.type === "offer") {
         console.log("📥 Oferta recebida de:", data.from)
         selectedUser = data.from
+        isInitiator = false
         setStatus("🟡 Conectando...")
         
         try {
