@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>P2P Share — Transferência sem fio entre dispositivos</title>
+<title>P2P Share — envie arquivos direto entre dois dispositivos</title>
+<meta name="description" content="Conecte dois dispositivos na mesma rede e transfira arquivos direto, sem passar por nenhuma nuvem. O servidor só faz a apresentação; o arquivo viaja ponta a ponta.">
+<meta property="og:title" content="P2P Share — envie arquivos direto entre dois dispositivos">
+<meta property="og:description" content="Escaneie o QR code, escolha o dispositivo e mande o arquivo direto. Sem upload, sem login, sem limite artificial de tamanho.">
+<meta property="og:url" content="https://p2p-wifi.onrender.com/">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#121110">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23121110'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23ff7a33'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%23ff7a33' stroke-width='1.6' opacity='0.55'/%3E%3Ccircle cx='16' cy='16' r='12.5' fill='none' stroke='%23ff7a33' stroke-width='1.2' opacity='0.3'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -11,13 +18,34 @@
 </head>
 <body data-state="idle">
 
+<!-- Modal: nome do dispositivo, pedido antes de entrar no canal -->
+<div id="nameModal" class="modal" aria-hidden="true">
+  <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="nameModalTitle">
+    <p class="eyebrow">Antes de entrar</p>
+    <h2 id="nameModalTitle" class="modal__title">Como você quer aparecer?</h2>
+    <p class="modal__hint">Esse nome é o que a outra pessoa vai ver na lista de dispositivos disponíveis.</p>
+    <form id="nameForm" class="modal__form">
+      <input id="nameInput" type="text" maxlength="30" autocomplete="off" required>
+      <button type="submit" class="switch switch--solid">
+        <span class="switch__label">Entrar no canal</span>
+      </button>
+    </form>
+  </div>
+</div>
+
 <div class="console">
 
   <!-- Cabeçalho / elemento assinatura -->
   <header class="console__header">
-    <p class="eyebrow">Sinal P2P · Wi-Fi local</p>
+    <div class="identity" id="identity">
+      <span class="identity__label">Você é</span>
+      <span class="identity__name" id="currentDeviceName">—</span>
+      <button type="button" id="editNameBtn" class="identity__edit" aria-label="Trocar nome do dispositivo">editar</button>
+    </div>
+
+    <p class="eyebrow">Sinal P2P · rede local</p>
     <h1 class="title">P2P Share</h1>
-    <p class="subtitle">Duas antenas, uma transferência. Sem servidor no meio do caminho.</p>
+    <p class="subtitle">O servidor só apresenta os dois dispositivos. O arquivo viaja direto, ponta a ponta.</p>
 
     <div class="signal-bridge" aria-hidden="true">
       <div class="node node--local">
@@ -46,11 +74,12 @@
       </div>
 
       <div class="qr-block">
-        <img id="qr" class="qr-block__img" alt="QR Code para conectar outro dispositivo" loading="lazy">
+        <img id="qr" class="qr-block__img" alt="QR Code para abrir o P2P Share no outro dispositivo" loading="lazy">
+        <p class="qr-block__caption">Aponte a câmera do outro aparelho para entrar no mesmo canal</p>
         <p id="link" class="qr-block__link" aria-live="polite"></p>
       </div>
 
-      <h3 class="sublabel">Dispositivos na frequência</h3>
+      <h3 class="sublabel">Dispositivos por perto</h3>
       <ul id="users" class="freq-list" role="listbox" aria-label="Lista de dispositivos disponíveis">
         <li class="freq-empty" data-placeholder>Procurando dispositivos por perto…</li>
       </ul>
@@ -95,7 +124,7 @@
   </main>
 
   <footer class="console__footer">
-    <p>Transferência direta por WebRTC — nenhum arquivo passa pelo servidor após a conexão.</p>
+    <p>Conexão direta por WebRTC. Sem upload, sem login, sem limite artificial de tamanho.</p>
   </footer>
 
 </div>

@@ -41,12 +41,12 @@ app.get("/", (req, res) => {
 app.get("/qrcode", async (req, res) => {
     try {
         let url
-        
-        // Detectar se está em produção pela variável de ambiente ou URL
-        const isProduction = process.env.NODE_ENV === "production" || req.get("host").includes("onrender.com") || req.get("host").includes("render.com")
-        
-        if (isProduction && process.env.PUBLIC_URL) {
-            url = process.env.PUBLIC_URL
+        const host = req.get("host") || ""
+        const isProduction = process.env.NODE_ENV === "production" || host.includes("onrender.com") || host.includes("render.com")
+
+        if (isProduction) {
+            // Usa a URL pública explícita se foi configurada, senão monta a partir do host real da requisição
+            url = process.env.PUBLIC_URL || `https://${host}`
         } else {
             // Uso local - pegar IP da máquina
             const ip = getLocalIP()
@@ -54,7 +54,10 @@ app.get("/qrcode", async (req, res) => {
             url = `http://${ip}:${port}`
         }
         
-        const qr = await QRCode.toDataURL(url)
+        const qr = await QRCode.toDataURL(url, {
+            margin: 1,
+            color: { dark: "#121110", light: "#f3ece1" }
+        })
         res.json({ qr, url })
     } catch (error) {
         console.error("❌ Erro ao gerar QR Code:", error.message)

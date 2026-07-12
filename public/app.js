@@ -5,9 +5,27 @@ function getDevice() {
     return "PC"
 }
 
-const socket = io()
+const DEVICE_NAME_KEY = "p2pShareDeviceName"
 
-console.log("🔌 Conectando ao servidor WebSocket...")
+function getStoredDeviceName() {
+    try {
+        return localStorage.getItem(DEVICE_NAME_KEY)
+    } catch (e) {
+        return null
+    }
+}
+
+function storeDeviceName(name) {
+    try {
+        localStorage.setItem(DEVICE_NAME_KEY, name)
+    } catch (e) {
+        // localStorage indisponível (modo privado, etc.) — segue sem persistir
+    }
+}
+
+// O socket só conecta de fato depois que a pessoa define um nome (ver bloco de nomeação no fim do arquivo)
+const socket = io({ autoConnect: false })
+
 socket.on("connect", () => {
     console.log("✅ Conectado ao servidor. Socket ID:", socket.id)
 })
@@ -491,3 +509,53 @@ document.getElementById("fileInput").addEventListener("change", async () => {
 })
 
 console.log("✅ App.js carregado com sucesso")
+
+// ============================================================
+// Nomeação do dispositivo — precisa acontecer antes de conectar
+// ============================================================
+function startSession(name) {
+    const modal = document.getElementById("nameModal")
+    if (modal) modal.setAttribute("aria-hidden", "true")
+
+    const currentNameEl = document.getElementById("currentDeviceName")
+    if (currentNameEl) currentNameEl.textContent = name
+
+    console.log("🔌 Conectando ao servidor WebSocket como:", name)
+    socket.io.opts.query = { device: name }
+    socket.connect()
+}
+
+function openNameModal(prefill) {
+    const modal = document.getElementById("nameModal")
+    const input = document.getElementById("nameInput")
+    if (!modal || !input) return
+    input.value = ""
+    input.placeholder = prefill ? `Ex: ${prefill} da Ana` : "Como você quer ser visto?"
+    modal.setAttribute("aria-hidden", "false")
+    setTimeout(() => input.focus(), 50)
+}
+
+const nameForm = document.getElementById("nameForm")
+if (nameForm) {
+    nameForm.addEventListener("submit", (event) => {
+        event.preventDefault()
+        const input = document.getElementById("nameInput")
+        const value = (input.value || "").trim().slice(0, 30) || getDevice()
+        storeDeviceName(value)
+        startSession(value)
+    })
+}
+
+const editNameBtn = document.getElementById("editNameBtn")
+if (editNameBtn) {
+    editNameBtn.addEventListener("click", () => {
+        openNameModal(getDevice())
+    })
+}
+
+const existingName = getStoredDeviceName()
+if (existingName) {
+    startSession(existingName)
+} else {
+    openNameModal(getDevice())
+}
